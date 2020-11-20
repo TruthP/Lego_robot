@@ -1,0 +1,56 @@
+package bpj5;
+
+import lejos.hardware.motor.Motor;
+import lejos.hardware.port.SensorPort;
+import lejos.robotics.SampleProvider;
+import lejos.robotics.navigation.DifferentialPilot;
+import lejos.hardware.sensor.EV3UltrasonicSensor;
+import lejos.hardware.sensor.HiTechnicIRSeekerV2;
+import lejos.hardware.sensor.HiTechnicCompass;
+import lejos.robotics.subsumption.Arbitrator;
+import lejos.robotics.subsumption.Behavior;
+
+public class BPJBallFinder {
+
+	public static void main(String[] args) {
+		try {
+			EV3UltrasonicSensor sonic = new EV3UltrasonicSensor(SensorPort.S1);
+			SampleProvider distance = sonic.getDistanceMode();
+			SampleBPJ us = new SampleBPJ(distance);
+
+			HiTechnicCompass compass = new HiTechnicCompass(SensorPort.S2);
+			SampleProvider compassAngle = compass.getAngleMode();
+			SampleBPJ cs = new SampleBPJ(compassAngle);
+
+			EV3UltrasonicSensor sonic2 = new EV3UltrasonicSensor(SensorPort.S3);
+			SampleProvider distance2 = sonic2.getDistanceMode();
+			SampleBPJ us2 = new SampleBPJ(distance2);
+
+			HiTechnicIRSeekerV2 seeker = new HiTechnicIRSeekerV2(SensorPort.S4);
+			SampleProvider direction = seeker.getModulatedMode();
+			SampleBPJ ss = new SampleBPJ(direction);
+
+			DifferentialPilot pilot = new DifferentialPilot(1.5F, 6, Motor.B, Motor.C, true);
+
+			Behavior b1 = new RotateBPJ(cs, us2, pilot);
+			Behavior b2 = new SeekerBPJ(ss, pilot);
+			Behavior b3 = new UltrasonicBPJ(us, pilot);
+			Behavior b4 = new Compass2BPJ(cs, pilot);
+			Behavior b5 = new CompassBPJ(cs, pilot);
+			Behavior b6 = new Ultrasonic2aBPJ(us2, pilot);
+			Behavior b7 = new Ultrasonic2bBPJ(us2, pilot);
+			Behavior b8 = new Ultrasonic2cBPJ(us2, pilot);
+			Behavior b9 = new Score2BPJ(us2, pilot);
+			Behavior b10 = new ScoreBPJ(us2, pilot);
+
+			Behavior[] bArray = { b1, b2, b3, b4, b5, b6, b7, b8, b9, b10 };
+			Arbitrator arby = new Arbitrator(bArray);
+			arby.go();
+
+		} catch (Exception e) {
+
+		}
+
+	}
+
+}

@@ -1,0 +1,184 @@
+import lejos.hardware.BrickFinder;
+import lejos.hardware.ev3.EV3;
+import lejos.hardware.motor.EV3LargeRegulatedMotor;
+import lejos.hardware.motor.EV3MediumRegulatedMotor;
+import lejos.hardware.port.MotorPort;
+import lejos.hardware.port.Port;
+import lejos.hardware.sensor.EV3UltrasonicSensor;
+import lejos.hardware.sensor.HiTechnicCompass;
+import lejos.hardware.sensor.HiTechnicIRSeekerV2;
+import lejos.robotics.SampleProvider;
+import lejos.robotics.navigation.DifferentialPilot;
+import lejos.utility.Delay;
+
+public class FindGoalOnThePitch {
+
+	DifferentialPilot pilot;
+
+	EV3LargeRegulatedMotor LEFT_MOTOR = new EV3LargeRegulatedMotor(MotorPort.C);
+	EV3LargeRegulatedMotor RIGHT_MOTOR = new EV3LargeRegulatedMotor(MotorPort.B);
+	EV3MediumRegulatedMotor MEDIUM_MOTOR = new EV3MediumRegulatedMotor(MotorPort.A);
+
+	public static void main(String[] args) {
+
+		new FindGoalOnThePitch();
+	}
+
+	public FindGoalOnThePitch() {
+
+		EV3 ev3brick = (EV3) BrickFinder.getLocal();
+		Port portS1 = ev3brick.getPort("S1");
+		Port portS2 = ev3brick.getPort("S2");
+		Port portS3 = ev3brick.getPort("S3");
+		Port portS4 = ev3brick.getPort("S4");
+
+		pilot = new DifferentialPilot(1.5f, 6, LEFT_MOTOR, RIGHT_MOTOR);
+
+		boolean startCompass = false;
+		boolean sonicStart = false;
+		boolean startForward = false;
+		boolean seekerClose = false;
+
+		EV3UltrasonicSensor sonicSensor = new EV3UltrasonicSensor(portS1);
+		SampleProvider sonicdistance = sonicSensor.getDistanceMode();
+		float[] sonicSample = new float[sonicdistance.sampleSize()];
+
+		HiTechnicCompass compass = new HiTechnicCompass(portS2);
+		SampleProvider compassstartingPosition = compass.getAngleMode();
+		float[] compassSample = new float[compassstartingPosition.sampleSize()];
+
+		EV3UltrasonicSensor sonicSensor2 = new EV3UltrasonicSensor(portS3);
+		SampleProvider sonicdistance2 = sonicSensor2.getDistanceMode();
+		float[] sonicSample2 = new float[sonicdistance2.sampleSize()];
+
+		HiTechnicIRSeekerV2 seeker = new HiTechnicIRSeekerV2(portS4);
+		SampleProvider seekerstartingPosition = seeker.getModulatedMode();
+		float[] seekerSample = new float[seekerstartingPosition.sampleSize()];
+
+		LEFT_MOTOR.setSpeed(300);
+		RIGHT_MOTOR.setSpeed(300);
+		MEDIUM_MOTOR.setSpeed(900);
+		pilot.setAngularSpeed(40.0);
+		pilot.setLinearSpeed(1.5);
+
+		compassstartingPosition.fetchSample(compassSample, 0);
+		float startingPosition = compassSample[0]; // tájoló által mért kezdőpozíció eltárolása
+
+		pilot.rotate(45); //fordulás a fal felé
+		pilot.stop();
+		sonicdistance2.fetchSample(sonicSample2, 0);
+		float startingDistance = sonicSample2[0]; // oldalra fordulás után a középpont és a fal közti távolság eltárolása
+
+		try {
+			seekerstartingPosition.fetchSample(seekerSample, 0);
+			sonicdistance.fetchSample(sonicSample, 0);
+			compassstartingPosition.fetchSample(compassSample, 0);
+			sonicdistance2.fetchSample(sonicSample2, 0);
+
+			Delay.msDelay(10);
+
+			if (seekerSample[0] == 0.0) { //a kereső által vett minta elemzése
+
+				LEFT_MOTOR.forward(); //elindulás a labda irányába, ha az a robottal szemben van (0.0)
+				RIGHT_MOTOR.forward();
+				if (sonicSample[0] < 0.1) { //a ultrahangos szenzor által vett minta elemzése
+
+					pilot.travel(1); // labda begyűjtése
+					pilot.stop();
+					pilot.travel(-2);
+					MEDIUM_MOTOR.rotate(-180);
+					pilot.travel(3);
+					MEDIUM_MOTOR.rotate(110);
+
+					LEFT_MOTOR.stop();
+					RIGHT_MOTOR.stop();
+
+					MEDIUM_MOTOR.stop();
+					startCompass = true; 
+					seeker.close();
+					seekerClose = true; //a seekerClose igazra áll, a labda begyűjtve, többé nem aktiválódik a keresést végző forgás.
+
+				} else {
+
+				}
+
+			} else {
+				if (!seekerClose) { 	// körbefordulás, amíg nincs meg a labda.
+							//addig forog, amíg a labda begyűjtése meg nem történik,
+							//a begyűjtés után a kezdetben hamis értékű seekerClose igazra áll, 
+							//ekkor befejeződik a forgás.
+					pilot.rotateRight();
+				}
+
+			}
+			if (startCompass == true) {
+
+				if (compassSample[0] >= startingPosition - 0.2 && compassSample[0] <= startingPosition + 0.2) { // megáll, ha megtalálja a startingPosition-ben eltárolt irányt
+																										
+
+					pilot.stop();
+					pilot.rotate(50); //fal felé fordulás
+
+					sonicStart = true;
+					compass.close();
+
+				} else { // forgás, amíg nem az eltárolt irányban áll
+
+					pilot.rotateRight();
+				}
+
+				if (sonicStart == true) {
+					sonicdistance2.fetchSample(sonicSample2, 0);
+
+					if (sonicSample2[0] > startingDistance + 0.1) { // pálya közepének megtalálása
+											
+						LEFT_MOTOR.forward(); //előre halad, ha a távolság nagyobb, mint a kezdetben eltárolt érték
+						RIGHT_MOTOR.forward();
+
+					} else if (sonicSample2[0] < startingDistance + 0.1) {
+
+						LEFT_MOTOR.backward(); //tolat, ha a távolság kisebb
+						RIGHT_MOTOR.backward();
+
+					} else {
+
+						pilot.stop(); //megáll, ha a mért távolság megegyezik a kezdeti értékkel
+						pilot.rotate(-45); // kapu felé fordulás
+
+						startForward = true;
+					}
+
+					if (startForward == true) {
+						sonicdistance2.fetchSample(sonicSample2, 0);
+						if (sonicSample2[0] > 0.3) { 
+
+							RIGHT_MOTOR.forward(); // kapu irányába haladás
+							LEFT_MOTOR.forward();
+						} else { // labda ellövése
+
+							pilot.stop();
+							MEDIUM_MOTOR.rotate(-100);
+							pilot.travel(-3);
+							MEDIUM_MOTOR.rotate(170);
+							pilot.travel(2);
+							MEDIUM_MOTOR.rotate(-90);
+							MEDIUM_MOTOR.rotate(80);
+
+							MEDIUM_MOTOR.close();
+
+							LEFT_MOTOR.close();
+							RIGHT_MOTOR.close();
+
+						}
+
+					}
+				}
+			}
+
+		} catch (Exception e) {
+
+		}
+
+	}
+
+}

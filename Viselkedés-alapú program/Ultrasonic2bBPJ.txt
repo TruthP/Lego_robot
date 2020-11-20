@@ -1,0 +1,58 @@
+package bpj5;
+
+import lejos.hardware.motor.Motor;
+import lejos.robotics.navigation.DifferentialPilot;
+import lejos.robotics.navigation.RotateMoveController;
+import lejos.robotics.subsumption.Behavior;
+
+public class Ultrasonic2bBPJ implements Behavior {
+
+	SampleBPJ us2;
+	float dist2;
+	DifferentialPilot pilot = new DifferentialPilot(1.5F, 6, Motor.B, Motor.C, true);
+	boolean suppressed;
+	static boolean startBackward = false;
+
+	public Ultrasonic2bBPJ(SampleBPJ us2, RotateMoveController p) {
+		this.us2 = us2;
+		this.pilot = (DifferentialPilot) p;
+
+		Motor.A.setSpeed(900);
+		Motor.B.setSpeed(300);
+		Motor.C.setSpeed(300);
+		pilot.setLinearSpeed(2.0);
+		pilot.setAngularSpeed(40.0);
+
+	}
+
+	@Override
+	public boolean takeControl() {
+		dist2 = us2.mesure() * 100;
+
+		return ((dist2 < (RotateBPJ.returnStartingDistance() - 1.0)) && CompassBPJ.returnStartUltrasonic2()
+				&& !Ultrasonic2aBPJ.isStartForward());
+	}
+
+	@Override
+	public void action() {
+
+		suppressed = false;
+		while (!suppressed) {
+			dist2 = us2.mesure() * 100;
+			startBackward = true;
+
+			System.out.println(dist2);
+
+			Motor.B.backward();
+			Motor.C.backward();
+
+		}
+
+	}
+
+	@Override
+	public void suppress() {
+		suppressed = true;
+	}
+
+}

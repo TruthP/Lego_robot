@@ -1,0 +1,66 @@
+package bpj5;
+
+import lejos.hardware.Button;
+import lejos.hardware.motor.Motor;
+import lejos.robotics.navigation.DifferentialPilot;
+import lejos.robotics.subsumption.Behavior;
+
+public class RotateBPJ implements Behavior {
+
+	DifferentialPilot pilot = new DifferentialPilot(1.5F, 6, Motor.B, Motor.C, true);
+	boolean start = false;
+	boolean suppressed;
+	SampleBPJ cs, us2;
+	static float startingPosition;
+	static float startingDistance;
+
+
+	public RotateBPJ(SampleBPJ cs, SampleBPJ us2, DifferentialPilot p) {
+		this.cs = cs;
+		this.us2 = us2;
+		this.pilot = p;
+
+		pilot.setLinearSpeed(1.5);
+		Motor.B.setSpeed(300);
+		Motor.C.setSpeed(300);
+		pilot.setAngularSpeed(40.0);
+
+		Button.ENTER.waitForPressAndRelease();
+		startingPosition = cs.mesure();
+		pilot.rotate(48);
+		startingDistance = us2.mesure() * 100;
+
+		start = true;
+
+	}
+
+	@Override
+	public boolean takeControl() {
+		return (!suppressed && start);
+	}
+
+	@Override
+	public void action() {
+		suppressed = false;
+		while (!suppressed) {
+
+			pilot.rotateRight();
+		}
+
+	}
+
+	public static float returnStartingDistance() {
+		return startingDistance;
+	}
+
+	public static float returnStartingPosition() {
+		return startingPosition;
+	}
+
+	@Override
+	public void suppress() {
+		suppressed = true;
+
+	}
+
+}
