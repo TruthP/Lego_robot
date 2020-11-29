@@ -26,11 +26,11 @@ public class RotateBPJ implements Behavior {
 		pilot.setAngularSpeed(40.0);
 
 		Button.ENTER.waitForPressAndRelease();
+
 		startingPosition = cs.mesure();
 		pilot.rotate(48);
 		startingDistance = us2.mesure() * 100;
 		pilot.rotate(-48);
-
 		start = true;
 
 	}
